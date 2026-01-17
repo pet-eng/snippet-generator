@@ -193,7 +193,7 @@
         const response = await fetch('/api/clip', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ youtube_url: selectedEpisode.url, start_time: startTime, end_time: endTime })
+          body: JSON.stringify({ folder_id: selectedEpisode.id, start_time: startTime, end_time: endTime })
         });
         if (!response.ok) { const error = await response.json(); throw new Error(error.error || 'Failed to generate clip'); }
         const blob = await response.blob();
