@@ -6,7 +6,7 @@ import yt_dlp
 app = Flask(__name__, static_folder='static')
 CORS(app)
 
-YOUTUBE_CHANNEL_ID = "UCKnu9e0Rk4BDQrt22sT1KpA"
+YOUTUBE_CHANNEL_ID = "UC8SaXHFAqVHUjE2OLUFakjw"
 MAX_CLIP_DURATION = 120
 TEMP_DIR = tempfile.gettempdir()
 
