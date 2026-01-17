@@ -26,51 +26,74 @@ def format_timestamp(seconds):
 def get_gdrive_folders(folder_id):
     """Get list of subfolders from a public Google Drive folder."""
     url = f"https://drive.google.com/embeddedfolderview?id={folder_id}"
-    headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
+    headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'}
     response = requests.get(url, headers=headers)
-
-    # Parse folder names and IDs from the HTML response
+    
     folders = []
-    # Match pattern for folder entries
-    import re
-    pattern = r'href="https://drive\.google\.com/drive/folders/([^"]+)"[^>]*>([^<]+)</a>'
-    matches = re.findall(pattern, response.text)
-
-    for folder_id, folder_name in matches:
-        folders.append({'id': folder_id, 'name': folder_name.strip()})
-
-    return folders
+    
+    # Try multiple patterns to match Google Drive's HTML
+    patterns = [
+        r'/drive/folders/([a-zA-Z0-9_-]+)["\'][^>]*>([^<]+)',
+        r'href="[^"]*folders/([a-zA-Z0-9_-]+)"[^>]*>([^<]+)',
+        r'data-id="([a-zA-Z0-9_-]+)"[^>]*>([^<]+)',
+        r'\["([a-zA-Z0-9_-]{20,})","([^"]+)"',
+    ]
+    
+    for pattern in patterns:
+        matches = re.findall(pattern, response.text)
+        if matches:
+            for folder_id_match, folder_name in matches:
+                name = folder_name.strip()
+                # Filter to only include episode-like folders
+                if name and len(name) > 1 and folder_id_match != folder_id:
+                    folders.append({'id': folder_id_match, 'name': name})
+            if folders:
+                break
+    
+    # Remove duplicates
+    seen = set()
+    unique_folders = []
+    for f in folders:
+        if f['id'] not in seen:
+            seen.add(f['id'])
+            unique_folders.append(f)
+    
+    return unique_folders
 
 def get_mp4_from_folder(folder_id):
     """Get the first MP4 file from a Google Drive folder."""
     url = f"https://drive.google.com/embeddedfolderview?id={folder_id}"
-    headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
+    headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'}
     response = requests.get(url, headers=headers)
 
-    # Match pattern for file entries (MP4)
-    pattern = r'href="https://drive\.google\.com/file/d/([^/]+)/[^"]*"[^>]*>([^<]*\.mp4)</a>'
-    matches = re.findall(pattern, response.text, re.IGNORECASE)
-
-    if matches:
-        return {'id': matches[0][0], 'name': matches[0][1]}
+    # Try multiple patterns for files
+    patterns = [
+        r'/file/d/([a-zA-Z0-9_-]+)[^>]*>([^<]*\.mp4)',
+        r'data-id="([a-zA-Z0-9_-]+)"[^>]*>([^<]*\.mp4)',
+        r'\["([a-zA-Z0-9_-]{20,})","([^"]*\.mp4)"',
+    ]
+    
+    for pattern in patterns:
+        matches = re.findall(pattern, response.text, re.IGNORECASE)
+        if matches:
+            return {'id': matches[0][0], 'name': matches[0][1]}
+    
     return None
 
 def download_gdrive_file(file_id, output_path):
     """Download a file from Google Drive."""
-    # Use the direct download URL for Google Drive
     url = f"https://drive.google.com/uc?export=download&id={file_id}&confirm=t"
     headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
 
-    response = requests.get(url, headers=headers, stream=True)
+    session = requests.Session()
+    response = session.get(url, headers=headers, stream=True)
 
     # Handle large file warning
-    if 'download_warning' in response.text or len(response.content) < 100000:
-        # Try to get the confirm token
-        for key, value in response.cookies.items():
-            if key.startswith('download_warning'):
-                url = f"https://drive.google.com/uc?export=download&id={file_id}&confirm={value}"
-                response = requests.get(url, headers=headers, stream=True)
-                break
+    for key, value in response.cookies.items():
+        if key.startswith('download_warning'):
+            url = f"https://drive.google.com/uc?export=download&id={file_id}&confirm={value}"
+            response = session.get(url, headers=headers, stream=True)
+            break
 
     with open(output_path, 'wb') as f:
         for chunk in response.iter_content(chunk_size=8192):
@@ -163,7 +186,6 @@ def generate_clip():
         return jsonify({'error': str(e)}), 500
 
     finally:
-        # Clean up temp files
         for path in [video_path, output_path]:
             if path and os.path.exists(path):
                 try: os.remove(path)
