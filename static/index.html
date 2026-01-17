@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tokenized - Sponsor Snippet Generator</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-primary: #0a1628;
+      --bg-secondary: #0d1e36;
+      --bg-card: #122642;
+      --bg-card-hover: #183352;
+      --border: #1e3a5f;
+      --text-primary: #ffffff;
+      --text-secondary: #8ba3c7;
+      --text-muted: #5a7a9e;
+      --accent: #00c8ff;
+      --accent-glow: rgba(0, 200, 255, 0.15);
+      --error: #ff6b6b;
+      --success: #4ade80;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Inter', sans-serif;
+      background: linear-gradient(180deg, var(--bg-primary) 0%, var(--bg-secondary) 100%);
+      color: var(--text-primary);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 2rem;
+    }
+    .container { width: 100%; max-width: 600px; }
+    .header { text-align: center; margin-bottom: 2rem; }
+    .logo { display: flex; align-items: center; justify-content: center; gap: 1rem; margin-bottom: 0.5rem; }
+    .logo-gem { width: 50px; height: 50px; }
+    .logo-text { font-size: 2rem; font-weight: 800; }
+    .subtitle { color: var(--text-secondary); font-size: 1rem; }
+    .card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 16px; padding: 2rem; margin-bottom: 1.5rem; }
+    .form-group { margin-bottom: 1.5rem; }
+    .form-label { display: block; font-size: 0.75rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 0.5rem; font-weight: 600; }
+    .form-select, .form-input { width: 100%; padding: 1rem; background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 8px; color: var(--text-primary); font-family: inherit; font-size: 0.95rem; transition: border-color 0.2s, box-shadow 0.2s; }
+    .form-select:focus, .form-input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-glow); }
+    .form-select { cursor: pointer; appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%238ba3c7' d='M6 8L1 3h10z'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 1rem center; }
+    .form-select option { background: var(--bg-secondary); color: var(--text-primary); }
+    .timestamp-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+    .form-input::placeholder { color: var(--text-muted); }
+    .form-hint { font-size: 0.75rem; color: var(--text-muted); margin-top: 0.5rem; }
+    .duration-display { text-align: center; padding: 0.75rem; background: var(--bg-secondary); border-radius: 8px; margin-bottom: 1.5rem; }
+    .duration-label { font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.1em; }
+    .duration-value { font-size: 1.25rem; font-weight: 700; color: var(--accent); }
+    .duration-value.error { color: var(--error); }
+    .btn { width: 100%; padding: 1rem; background: var(--accent); border: none; border-radius: 8px; color: var(--bg-primary); font-family: inherit; font-size: 1rem; font-weight: 700; cursor: pointer; transition: all 0.2s; }
+    .btn:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0, 200, 255, 0.3); }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .status { text-align: center; padding: 1.5rem; border-radius: 12px; margin-top: 1rem; display: none; }
+    .status.show { display: block; }
+    .status.loading { background: var(--accent-glow); border: 1px solid var(--accent); }
+    .status.error { background: rgba(255, 107, 107, 0.1); border: 1px solid var(--error); color: var(--error); }
+    .status.success { background: rgba(74, 222, 128, 0.1); border: 1px solid var(--success); color: var(--success); }
+    .spinner { width: 24px; height: 24px; border: 3px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 1rem; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .episode-preview { display: none; margin-top: 1rem; padding: 1rem; background: var(--bg-secondary); border-radius: 8px; }
+    .episode-preview.show { display: flex; gap: 1rem; align-items: center; }
+    .episode-thumbnail { width: 120px; height: 68px; object-fit: cover; border-radius: 6px; }
+    .episode-info { flex: 1; }
+    .episode-title { font-size: 0.9rem; font-weight: 600; margin-bottom: 0.25rem; line-height: 1.3; }
+    .episode-duration { font-size: 0.75rem; color: var(--text-muted); }
+    .footer { text-align: center; padding: 2rem; color: var(--text-muted); font-size: 0.75rem; }
+    .footer a { color: var(--accent); text-decoration: none; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header class="header">
+      <div class="logo">
+        <svg class="logo-gem" viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect x="32" y="4" width="16" height="4" fill="#4dd9ff"/><rect x="24" y="8" width="8" height="4" fill="#00c8ff"/><rect x="48" y="8" width="8" height="4" fill="#00c8ff"/><rect x="20" y="12" width="4" height="4" fill="#0099cc"/><rect x="56" y="12" width="4" height="4" fill="#0099cc"/><rect x="16" y="16" width="4" height="8" fill="#0099cc"/><rect x="60" y="16" width="4" height="8" fill="#0099cc"/><rect x="12" y="24" width="4" height="16" fill="#0099cc"/><rect x="64" y="24" width="4" height="16" fill="#0099cc"/><rect x="16" y="40" width="4" height="8" fill="#0099cc"/><rect x="60" y="40" width="4" height="8" fill="#0099cc"/><rect x="20" y="48" width="4" height="4" fill="#0099cc"/><rect x="56" y="48" width="4" height="4" fill="#0099cc"/><rect x="24" y="52" width="8" height="4" fill="#0099cc"/><rect x="48" y="52" width="8" height="4" fill="#0099cc"/><rect x="32" y="56" width="16" height="4" fill="#00c8ff"/><rect x="36" y="60" width="8" height="4" fill="#4dd9ff"/><rect x="24" y="12" width="32" height="4" fill="#4dd9ff"/><rect x="20" y="16" width="40" height="4" fill="#00c8ff"/><rect x="16" y="20" width="48" height="4" fill="#00c8ff"/><rect x="16" y="24" width="48" height="16" fill="#00a8e6"/><rect x="20" y="40" width="40" height="8" fill="#0099cc"/><rect x="24" y="48" width="32" height="4" fill="#0088bb"/><rect x="32" y="52" width="16" height="4" fill="#0077aa"/><rect x="24" y="20" width="8" height="20" fill="#4dd9ff"/><rect x="32" y="16" width="4" height="24" fill="#80e5ff"/><rect x="52" y="8" width="4" height="4" fill="#ffffff"/><rect x="56" y="4" width="4" height="4" fill="#ffffff"/><rect x="60" y="8" width="4" height="4" fill="#ffffff"/>
+        </svg>
+        <span class="logo-text">TOKENIZED</span>
+      </div>
+      <p class="subtitle">Sponsor Snippet Generator</p>
+    </header>
+    <div class="card">
+      <form id="clipForm">
+        <div class="form-group">
+          <label class="form-label" for="episode">Select Episode</label>
+          <select class="form-select" id="episode" required>
+            <option value="">Loading episodes...</option>
+          </select>
+          <div class="episode-preview" id="episodePreview">
+            <img class="episode-thumbnail" id="episodeThumbnail" src="" alt="">
+            <div class="episode-info">
+              <div class="episode-title" id="episodeTitle"></div>
+              <div class="episode-duration" id="episodeDuration"></div>
+            </div>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Clip Timestamps</label>
+          <div class="timestamp-row">
+            <div>
+              <input type="text" class="form-input" id="startTime" placeholder="0:00" required>
+              <div class="form-hint">Start (MM:SS)</div>
+            </div>
+            <div>
+              <input type="text" class="form-input" id="endTime" placeholder="2:00" required>
+              <div class="form-hint">End (MM:SS)</div>
+            </div>
+          </div>
+        </div>
+        <div class="duration-display">
+          <div class="duration-label">Clip Duration</div>
+          <div class="duration-value" id="durationDisplay">0:00</div>
+        </div>
+        <button type="submit" class="btn" id="generateBtn">Generate Clip</button>
+      </form>
+      <div class="status" id="status">
+        <div class="spinner"></div>
+        <div class="status-text" id="statusText">Generating your clip...</div>
+      </div>
+    </div>
+    <footer class="footer">
+      <a href="https://www.tokenizedpod.com/" target="_blank">tokenizedpod.com</a>
+      <br><span style="opacity:0.7">For sponsor use only</span>
+    </footer>
+  </div>
+  <script>
+    let episodes = [];
+    let selectedEpisode = null;
+    async function fetchEpisodes() {
+      try {
+        const response = await fetch('/api/episodes');
+        const data = await response.json();
+        if (data.error) throw new Error(data.error);
+        episodes = data.episodes || [];
+        const select = document.getElementById('episode');
+        select.innerHTML = '<option value="">Select an episode...</option>' + episodes.map((ep, i) => `<option value="${i}">${ep.title}</option>`).join('');
+      } catch (error) {
+        console.error('Failed to fetch episodes:', error);
+        document.getElementById('episode').innerHTML = '<option value="">Failed to load episodes</option>';
+      }
+    }
+    document.getElementById('episode').addEventListener('change', function() {
+      const preview = document.getElementById('episodePreview');
+      if (this.value === '') { preview.classList.remove('show'); selectedEpisode = null; return; }
+      selectedEpisode = episodes[parseInt(this.value)];
+      document.getElementById('episodeThumbnail').src = selectedEpisode.thumbnail;
+      document.getElementById('episodeTitle').textContent = selectedEpisode.title;
+      document.getElementById('episodeDuration').textContent = `Duration: ${formatDuration(selectedEpisode.duration)}`;
+      preview.classList.add('show');
+    });
+    function parseTimestamp(ts) {
+      const parts = ts.trim().split(':').map(Number);
+      if (parts.length === 2) return parts[0] * 60 + parts[1];
+      if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
+      return 0;
+    }
+    function formatDuration(seconds) {
+      if (!seconds) return '0:00';
+      const mins = Math.floor(seconds / 60);
+      const secs = Math.floor(seconds % 60);
+      return `${mins}:${secs.toString().padStart(2, '0')}`;
+    }
+    function updateDuration() {
+      const startTime = document.getElementById('startTime').value;
+      const endTime = document.getElementById('endTime').value;
+      const display = document.getElementById('durationDisplay');
+      if (!startTime || !endTime) { display.textContent = '0:00'; display.classList.remove('error'); return; }
+      const startSeconds = parseTimestamp(startTime);
+      const endSeconds = parseTimestamp(endTime);
+      const duration = endSeconds - startSeconds;
+      if (duration <= 0) { display.textContent = 'Invalid'; display.classList.add('error'); }
+      else if (duration > 120) { display.textContent = `${formatDuration(duration)} (max 2:00)`; display.classList.add('error'); }
+      else { display.textContent = formatDuration(duration); display.classList.remove('error'); }
+    }
+    document.getElementById('startTime').addEventListener('input', updateDuration);
+    document.getElementById('endTime').addEventListener('input', updateDuration);
+    document.getElementById('clipForm').addEventListener('submit', async function(e) {
+      e.preventDefault();
+      if (!selectedEpisode) { showStatus('error', 'Please select an episode'); return; }
+      const startTime = document.getElementById('startTime').value;
+      const endTime = document.getElementById('endTime').value;
+      const duration = parseTimestamp(endTime) - parseTimestamp(startTime);
+      if (duration <= 0) { showStatus('error', 'End time must be after start time'); return; }
+      if (duration > 120) { showStatus('error', 'Clip cannot exceed 2 minutes'); return; }
+      showStatus('loading', 'Generating your clip... This may take 1-2 minutes.');
+      document.getElementById('generateBtn').disabled = true;
+      try {
+        const response = await fetch('/api/clip', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ youtube_url: selectedEpisode.url, start_time: startTime, end_time: endTime })
+        });
+        if (!response.ok) { const error = await response.json(); throw new Error(error.error || 'Failed to generate clip'); }
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `tokenized_clip_${selectedEpisode.id}_${startTime.replace(':', '-')}.mp4`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        a.remove();
+        showStatus('success', 'Clip generated! Your download should start automatically.');
+      } catch (error) { showStatus('error', error.message); }
+      finally { document.getElementById('generateBtn').disabled = false; }
+    });
+    function showStatus(type, message) {
+      const status = document.getElementById('status');
+      const statusText = document.getElementById('statusText');
+      status.className = 'status show ' + type;
+      statusText.textContent = message;
+      status.querySelector('.spinner').style.display = type === 'loading' ? 'block' : 'none';
+    }
+    fetchEpisodes();
+  </script>
+</body>
+</html>
