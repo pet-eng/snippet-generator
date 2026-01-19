@@ -6,10 +6,19 @@ import subprocess
 app = Flask(__name__, static_folder='static')
 CORS(app)
 
-# Google Drive folder ID (from the shared link)
-GDRIVE_FOLDER_ID = "1cTr1l6rYELx8VQKAvFoc6gP7t3MBZQZh"
 MAX_CLIP_DURATION = 120
 TEMP_DIR = tempfile.gettempdir()
+
+# Hardcoded episodes - add new episodes here
+# Format: {'title': 'Episode Title', 'file_id': 'Google Drive file ID'}
+EPISODES = [
+    {'title': 'Ep. 66', 'file_id': '1WRjWlHQHYR2GsIvTp5PgZ8xH53Ldz-_2', 'is_folder': True},
+    {'title': 'Ep. 65', 'file_id': '1EaqVsa7AzZCml4t-UXmdIfA85AX9Zj3I', 'is_folder': False},
+    {'title': 'Ep. 64', 'file_id': '1_T1IJawnFPfoAsy4gfcODanBTfm2br2a', 'is_folder': False},
+    {'title': 'Ep. 63', 'file_id': '1ElAuxl7_PjgpWzZDIoIqBRchjPNZ4HVr', 'is_folder': False},
+    {'title': 'Ep. 62', 'file_id': '19Hq49X8zyfySIa3gTn0maOPW50As-wUa', 'is_folder': False},
+    {'title': 'Ep. 61', 'file_id': '1Vy0OdQb1oPc81FlZVMpz_iisA3nqYISo', 'is_folder': False},
+]
 
 def parse_timestamp(ts):
     parts = ts.strip().split(':')
@@ -23,61 +32,21 @@ def format_timestamp(seconds):
     secs = seconds % 60
     return f"{hours:02d}:{minutes:02d}:{secs:02d}"
 
-def get_gdrive_folders(folder_id):
-    """Get list of subfolders from a public Google Drive folder."""
-    url = f"https://drive.google.com/embeddedfolderview?id={folder_id}"
-    headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'}
-    response = requests.get(url, headers=headers)
-    
-    folders = []
-    
-    # Try multiple patterns to match Google Drive's HTML
-    patterns = [
-        r'/drive/folders/([a-zA-Z0-9_-]+)["\'][^>]*>([^<]+)',
-        r'href="[^"]*folders/([a-zA-Z0-9_-]+)"[^>]*>([^<]+)',
-        r'data-id="([a-zA-Z0-9_-]+)"[^>]*>([^<]+)',
-        r'\["([a-zA-Z0-9_-]{20,})","([^"]+)"',
-    ]
-    
-    for pattern in patterns:
-        matches = re.findall(pattern, response.text)
-        if matches:
-            for folder_id_match, folder_name in matches:
-                name = folder_name.strip()
-                # Filter to only include episode-like folders
-                if name and len(name) > 1 and folder_id_match != folder_id:
-                    folders.append({'id': folder_id_match, 'name': name})
-            if folders:
-                break
-    
-    # Remove duplicates
-    seen = set()
-    unique_folders = []
-    for f in folders:
-        if f['id'] not in seen:
-            seen.add(f['id'])
-            unique_folders.append(f)
-    
-    return unique_folders
-
 def get_mp4_from_folder(folder_id):
     """Get the first MP4 file from a Google Drive folder."""
     url = f"https://drive.google.com/embeddedfolderview?id={folder_id}"
-    headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'}
+    headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
     response = requests.get(url, headers=headers)
 
-    # Try multiple patterns for files
     patterns = [
         r'/file/d/([a-zA-Z0-9_-]+)[^>]*>([^<]*\.mp4)',
         r'data-id="([a-zA-Z0-9_-]+)"[^>]*>([^<]*\.mp4)',
-        r'\["([a-zA-Z0-9_-]{20,})","([^"]*\.mp4)"',
     ]
-    
+
     for pattern in patterns:
         matches = re.findall(pattern, response.text, re.IGNORECASE)
         if matches:
-            return {'id': matches[0][0], 'name': matches[0][1]}
-    
+            return matches[0][0]
     return None
 
 def download_gdrive_file(file_id, output_path):
@@ -88,7 +57,6 @@ def download_gdrive_file(file_id, output_path):
     session = requests.Session()
     response = session.get(url, headers=headers, stream=True)
 
-    # Handle large file warning
     for key, value in response.cookies.items():
         if key.startswith('download_warning'):
             url = f"https://drive.google.com/uc?export=download&id={file_id}&confirm={value}"
@@ -108,24 +76,17 @@ def serve_index():
 @app.route('/api/episodes', methods=['GET'])
 def get_episodes():
     try:
-        folders = get_gdrive_folders(GDRIVE_FOLDER_ID)
-
         episodes = []
-        for folder in folders:
-            name = folder['name']
-            # Extract episode number if present
-            ep_match = re.search(r'[Ee]p\.?\s*(\d+)', name)
-            ep_num = int(ep_match.group(1)) if ep_match else 0
+        for i, ep in enumerate(EPISODES):
+            ep_match = re.search(r'[Ee]p\.?\s*(\d+)', ep['title'])
+            ep_num = int(ep_match.group(1)) if ep_match else i
 
             episodes.append({
-                'id': folder['id'],
-                'title': name,
+                'id': ep['file_id'],
+                'title': ep['title'],
                 'episode_num': ep_num,
-                'thumbnail': f"https://drive.google.com/thumbnail?id={folder['id']}&sz=w320"
+                'is_folder': ep.get('is_folder', False)
             })
-
-        # Sort by episode number descending (newest first)
-        episodes.sort(key=lambda x: x['episode_num'], reverse=True)
 
         return jsonify({'episodes': episodes})
     except Exception as e:
@@ -137,11 +98,12 @@ def generate_clip():
     output_path = None
     try:
         data = request.get_json()
-        folder_id = data.get('folder_id')
+        file_id = data.get('file_id')
+        is_folder = data.get('is_folder', False)
         start_time = data.get('start_time')
         end_time = data.get('end_time')
 
-        if not all([folder_id, start_time, end_time]):
+        if not all([file_id, start_time, end_time]):
             return jsonify({'error': 'Missing fields'}), 400
 
         start_sec = parse_timestamp(start_time)
@@ -152,17 +114,17 @@ def generate_clip():
         if end_sec - start_sec > MAX_CLIP_DURATION:
             return jsonify({'error': 'Max 2 minutes'}), 400
 
-        # Get the MP4 file from the folder
-        mp4_file = get_mp4_from_folder(folder_id)
-        if not mp4_file:
-            return jsonify({'error': 'No MP4 file found in episode folder'}), 404
+        if is_folder:
+            mp4_file_id = get_mp4_from_folder(file_id)
+            if not mp4_file_id:
+                return jsonify({'error': 'No MP4 file found in episode folder'}), 404
+        else:
+            mp4_file_id = file_id
 
-        # Download the video
         video_path = os.path.join(TEMP_DIR, f"source_{uuid.uuid4().hex[:8]}.mp4")
-        if not download_gdrive_file(mp4_file['id'], video_path):
+        if not download_gdrive_file(mp4_file_id, video_path):
             return jsonify({'error': 'Failed to download video'}), 500
 
-        # Cut the clip using FFmpeg
         output_path = os.path.join(TEMP_DIR, f"tokenized_clip_{uuid.uuid4().hex[:8]}.mp4")
 
         cmd = [
